@@ -1,7 +1,10 @@
-// 1. Datos de Prueba
+// =============================================================
+//   GAMEZONE STORE - SCRIPT COMPLETO + PAGINACIÓN NUMERADA
+// =============================================================
 
 console.log('public/script.js loaded');
 
+// 1. Datos de Prueba (fallback local)
 const videojuegos = [
   { id: 1, nombre: "Fortnite", descripcion: "Battle Royale · Acción · Multiplataforma", rating: 4.5, imagen: "https://via.placeholder.com/600x400?text=Fortnite" },
   { id: 2, nombre: "Among Us", descripcion: "Social · Multijugador · PC/Mobile", rating: 4.4, imagen: "https://via.placeholder.com/600x400?text=Among+Us" },
@@ -25,6 +28,11 @@ const videojuegos = [
   { id: 20, nombre: "God of War", descripcion: "Acción · Aventura · PS4/PS5", rating: 4.8, imagen: "https://via.placeholder.com/600x400?text=God+of+War" },
 ];
 
+// Scroll suave a la parte superior (para paginación)
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // Referencias a elementos de la UI
   const grid = document.querySelector('#grid-videojuegos');
@@ -45,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalSale = document.querySelector('#modal-sale');
   const modalLink = document.querySelector('#modal-link');
   const modalClose = document.querySelector('#modal-close');
+  const pagination = document.querySelector('#pagination'); // contenedor de paginación numerada
 
   if (!grid) {
     console.error('No se encontró el elemento con id "grid-videojuegos".');
@@ -53,6 +62,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const API_BASE = 'https://www.cheapshark.com/api/1.0';
 
+  // State
+  let pageNumber = 0;
+  const pageSize = 20;
+  let juegosActuales = []; // Guardar juegos actuales para poder ordenarlos
+
+  // Estado extra para paginación numerada
+  let currentPage = 0;   // página actual (0-based)
+  let totalPages = 1;    // se va ajustando dinámicamente
+
+  // -------------------------------------------------------
+  // Loading
+  // -------------------------------------------------------
   function showLoading(show) {
     if (!loadingIndicator) return;
     loadingIndicator.classList.toggle('hidden', !show);
@@ -62,22 +83,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (progressBar) {
         progressBar.classList.remove('hidden');
         progressBar.style.width = '10%';
-        // Animación gradual mientras carga
         const interval = setInterval(() => {
           const currentWidth = parseFloat(progressBar.style.width);
           if (currentWidth < 90) {
             progressBar.style.width = (currentWidth + Math.random() * 30) + '%';
           }
         }, 500);
-        // Guardar el interval en el elemento para poder limpiarlo después
         progressBar._loadingInterval = interval;
       }
     } else {
-      // Completar la barra de progreso
       if (progressBar && progressBar._loadingInterval) {
         clearInterval(progressBar._loadingInterval);
         progressBar.style.width = '100%';
-        // Ocultar despues de la animacion
         setTimeout(() => {
           progressBar.classList.add('hidden');
           progressBar.style.width = '0%';
@@ -96,8 +113,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // -------------------------------------------------------
+  // Normalizar datos de juego (API + locales)
+  // -------------------------------------------------------
   function normalizeJuego(juego) {
-   // Normalizar tanto las estructuras de acuerdos locales como las de la API a campos comunes utilizados en la plantilla
     const title = juego.nombre || juego.title || juego.external || 'Sin título';
     const image = juego.imagen || juego.thumb || '';
     const description = juego.descripcion || juego.saleText || '';
@@ -109,24 +128,42 @@ document.addEventListener('DOMContentLoaded', () => {
     return { id, title, image, description, salePrice, normalPrice, savings, url };
   }
 
-  // Funcion auxiliar para crear una tarjeta de juego
-  function crearCard(juego) {
+  // -------------------------------------------------------
+  // Crear tarjeta
+  // -------------------------------------------------------
+  function crearCard(juegoNormalizado) {
+    const juego = juegoNormalizado;
     const card = document.createElement('article');
     card.className = 'bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100 flex flex-col hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer';
     card.innerHTML = `
       <div class="relative overflow-hidden h-40">
-        ${/* asegurar que nunca se deje src vacío y fijar tamaño para evitar icono gigante */''}
-        <img src="${juego.image || 'https://via.placeholder.com/600x400?text=No+image'}" alt="${juego.title}" class="w-full h-40 sm:h-48 md:h-44 lg:h-48 object-cover hover:scale-110 transition-transform duration-300" loading="lazy" />
-        <div class="absolute top-2 right-2 bg-gradient-to-r from-teal-500 to-sky-600 text-white px-3 py-1 rounded-full text-xs font-bold">${Math.round(juego.savings)}% OFF</div>
+        <img src="${juego.image || 'https://via.placeholder.com/600x400?text=No+image'}"
+             alt="${juego.title}"
+             class="w-full h-40 sm:h-48 md:h-44 lg:h-48 object-cover hover:scale-110 transition-transform duration-300"
+             loading="lazy" />
+        <div class="absolute top-2 right-2 bg-gradient-to-r from-teal-500 to-sky-600 text-white px-3 py-1 rounded-full text-xs font-bold">
+          ${Math.round(juego.savings)}% OFF
+        </div>
       </div>
       <div class="p-4 flex flex-col gap-2 flex-1">
         <h3 class="font-bold text-slate-900 leading-tight text-sm">${juego.title}</h3>
         <p class="text-xs text-slate-500">${juego.description}</p>
         <div class="mt-auto space-y-2">
-          <p class="text-sm text-slate-700"><span class="font-black text-emerald-600">${juego.salePrice ? '$' + juego.salePrice : '—'}</span></p>
+          <p class="text-sm text-slate-700">
+            <span class="font-black text-emerald-600">
+              ${juego.salePrice ? '$' + juego.salePrice : '—'}
+            </span>
+          </p>
           ${juego.normalPrice ? `<p class="text-xs text-slate-400 line-through">$${juego.normalPrice}</p>` : ''}
         </div>
-        <button class="mt-3 w-full bg-gradient-to-r from-sky-600 to-teal-600 text-white py-2 rounded-lg text-xs font-bold hover:shadow-lg transition transform hover:scale-105" data-url="${juego.url}" data-title="${encodeURIComponent(juego.title)}" data-image="${juego.image}" data-normal="${juego.normalPrice}" data-sale="${juego.salePrice}">🎮 Ver detalle</button>
+        <button class="mt-3 w-full bg-gradient-to-r from-sky-600 to-teal-600 text-white py-2 rounded-lg text-xs font-bold hover:shadow-lg transition transform hover:scale-105"
+                data-url="${juego.url}"
+                data-title="${encodeURIComponent(juego.title)}"
+                data-image="${juego.image}"
+                data-normal="${juego.normalPrice}"
+                data-sale="${juego.salePrice}">
+          🎮 Ver detalle
+        </button>
       </div>
     `;
 
@@ -162,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return card;
   }
 
-  // fallback para la imagen del modal en caso de error
+  // fallback para la imagen del modal
   if (modalImage) {
     modalImage.addEventListener('error', () => {
       modalImage.src = 'https://via.placeholder.com/600x400?text=Imagen+no+disponible';
@@ -170,8 +207,119 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // -------------------------------------------------------
+  // Paginación numerada
+  // -------------------------------------------------------
+  function renderPagination() {
+    if (!pagination) return;
+
+    pagination.innerHTML = '';
+
+    if (totalPages <= 1) {
+      // si solo hay una página, no mostramos nada
+      return;
+    }
+
+    const makeBtn = (label, disabled, isActive, onClick) => {
+      const btn = document.createElement('button');
+      btn.textContent = label;
+      btn.disabled = disabled;
+      btn.className =
+        'px-3 py-1 rounded text-sm mx-1 ' +
+        (disabled
+          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+          : isActive
+          ? 'bg-teal-600 text-white font-bold'
+          : 'bg-slate-200 hover:bg-slate-300');
+      if (!disabled) {
+        btn.addEventListener('click', onClick);
+      }
+      return btn;
+    };
+
+    // Prev
+    pagination.appendChild(
+      makeBtn('◀', currentPage === 0, false, () => cambiarPagina(currentPage - 1))
+    );
+
+    // Números
+    for (let i = 0; i < totalPages; i++) {
+      pagination.appendChild(
+        makeBtn(
+          String(i + 1),
+          false,
+          i === currentPage,
+          () => cambiarPagina(i)
+        )
+      );
+    }
+
+    // Next
+    pagination.appendChild(
+      makeBtn(
+        '▶',
+        currentPage >= totalPages - 1,
+        false,
+        () => cambiarPagina(currentPage + 1)
+      )
+    );
+  }
+
+  async function cambiarPagina(numPage) {
+    try {
+      showError('');
+      showLoading(true);
+
+      if (numPage < 0) numPage = 0;
+      currentPage = numPage;
+      pageNumber = numPage;
+
+      const storeID = storeSelect ? (storeSelect.value || '') : '';
+      const title = searchInput ? searchInput.value.trim() : '';
+
+      console.log(`📄 Cambiando a página ${currentPage} (storeID=${storeID}, title="${title}")`);
+
+      const datos = await fetchDeals({
+        storeID,
+        pageSize,
+        pageNumber: currentPage,
+        title
+      });
+
+      if (datos && datos.length > 0) {
+        renderizarVideojuegos(datos);
+        showError('');
+      } else {
+        console.warn('⚠️ Página sin resultados');
+        renderizarVideojuegos([]);
+        showError('No hay más resultados para mostrar.');
+        // Si ya no hay resultados, ajustamos totalPages
+        if (currentPage > 0) {
+          totalPages = currentPage + 1;
+        } else {
+          totalPages = 1;
+        }
+      }
+
+      // Ajuste simple de totalPages: si vino página llena, asumimos que puede haber otra
+      if (datos && datos.length === pageSize && totalPages < currentPage + 2) {
+        totalPages = currentPage + 2;
+      }
+
+      renderPagination();
+      scrollToTop();
+    } catch (e) {
+      console.error('❌ Error cambiando de página:', e);
+      showError(`Error cambiando de página: ${e.message}`);
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // -------------------------------------------------------
+  // Render principal
+  // -------------------------------------------------------
   function renderizarVideojuegos(lista) {
-    // Limpia el grid antes de renderizar evita duplicados
     console.log('🧹 [Renderizar] Limpiando grid...');
     grid.innerHTML = '';
 
@@ -181,9 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Guardar juegos actuales para poder ordenar despues
     juegosActuales = lista.slice();
-    
     resultsCount.textContent = `${lista.length} resultados`;
 
     lista.forEach((j) => {
@@ -193,9 +339,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     console.log(`✅ [Renderizar] ${lista.length} juegos renderizados sin duplicados`);
+
+    // Actualizar paginación cada vez que se renderiza
+    renderPagination();
   }
 
+  // -------------------------------------------------------
   // API helpers
+  // -------------------------------------------------------
   async function fetchStores() {
     try {
       const res = await fetch(`${API_BASE}/stores`);
@@ -264,24 +415,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // State
-  let pageNumber = 0;
-  const pageSize = 20;
-  let juegosActuales = []; // Guardar juegos actuales para poder ordenarlos
-
-  // Cargar tiendas y poblar el selector
+  // -------------------------------------------------------
+  // Cargar tiendas y poblar selector
+  // -------------------------------------------------------
   async function cargarTiendas() {
     try {
       console.log('📥 Iniciando carga de tiendas...');
       const stores = await fetchStores();
-      if (stores && stores.length) {
-        // Limpiar opciones previas excepto "Todas las tiendas"
+      if (stores && stores.length && storeSelect) {
         const opcionesExistentes = storeSelect.querySelectorAll('option');
         opcionesExistentes.forEach((opt, idx) => {
-          if (idx > 0) opt.remove(); // Mantener la primera opcion
+          if (idx > 0) opt.remove();
         });
 
-        // Añadir tiendas
         stores.forEach(store => {
           const opt = document.createElement('option');
           opt.value = store.storeID;
@@ -301,25 +447,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Cargar inicial: intenta API y si falla usa los locales
+  // -------------------------------------------------------
+  // Carga inicial
+  // -------------------------------------------------------
   async function cargarVideojuegosInicial() {
     try {
       showError('');
       showLoading(true);
       console.log('🚀 Iniciando carga inicial de juegos...');
 
-      // Cargar tiendas en paralelo
-      const tiendasCargadas = await cargarTiendas();
+      await cargarTiendas();
 
-      // Cargar deals iniciales (Steam = storeID 1)
       console.log('📥 Solicitando ofertas iniciales desde Steam (CheapShark API)...');
       const datos = await fetchDeals({ storeID: 1, pageSize, pageNumber: 0 });
 
       if (datos && datos.length > 0) {
         console.log(`✓ ${datos.length} juegos cargados exitosamente desde la API`);
         window._juegosCache = datos;
+        currentPage = 0;
+        totalPages = 2; // asumimos al menos 2 páginas de inicio, se irá ajustando
         renderizarVideojuegos(datos);
-        showError(''); // Limpiar cualquier error previo
+        showError('');
       } else {
         throw new Error('La API devolvió resultados vacíos');
       }
@@ -327,9 +475,10 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('❌ Error al cargar desde API:', e.message);
       console.log('⚠️ Usando juegos locales como fallback...');
       
-      // fallback: usa el array local `videojuegos` si existe
-      if (typeof videojuegos !== 'undefined' && Array.isArray(videojuegos) && videojuegos.length > 0) {
+      if (Array.isArray(videojuegos) && videojuegos.length > 0) {
         console.log(`✓ ${videojuegos.length} juegos locales cargados como fallback`);
+        currentPage = 0;
+        totalPages = 1;
         renderizarVideojuegos(videojuegos);
         showError(`⚠️ API no disponible. Mostrando ${videojuegos.length} juegos locales (algunos datos podrían no ser actuales)`);
       } else {
@@ -341,116 +490,92 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Busqueda usando /games?title=texto&limit=20 y luego obtener deals por title
+  // -------------------------------------------------------
+  // Búsqueda
+  // -------------------------------------------------------
   async function buscarPorTitulo(text) {
     try {
-      if (!text || text.trim() === '') {
+      const q = (text || '').trim();
+      if (!q) {
         showError('Por favor ingresa un término de búsqueda');
         return;
       }
-      
+
+      searchInput.value = q;
       showError('');
-      showLoading(true);
+      currentPage = 0;
       pageNumber = 0;
-      
-      console.log(`🔍 Buscando: "${text}"`);
-      const deals = await fetchDeals({ title: text, storeID: storeSelect.value, pageSize, pageNumber });
-      
-      if (deals && deals.length > 0) {
-        console.log(`✓ Búsqueda exitosa: ${deals.length} resultados`);
-        renderizarVideojuegos(deals);
-        showError('');
-      } else {
-        console.warn('⚠️ No se encontraron resultados');
-        showError(`No se encontraron juegos para "${text}". Intenta con otro término.`);
-        grid.innerHTML = '';
-        resultsCount.textContent = 'Sin resultados';
-      }
+      await cambiarPagina(0); // reutiliza la lógica de paginación
     } catch (e) {
       console.error('❌ Error en búsqueda:', e.message);
       showError(`❌ Error en la búsqueda: ${e.message}`);
-    } finally {
-      showLoading(false);
     }
   }
 
+  // -------------------------------------------------------
   // Filtrar por tienda
+  // -------------------------------------------------------
   async function filtrarPorTienda() {
     try {
       showError('');
-      showLoading(true);
+      currentPage = 0;
       pageNumber = 0;
-      const storeID = storeSelect.value || '';
-      const storeName = storeSelect.options[storeSelect.selectedIndex].text;
-      console.log(`🏪 Filtrando por: ${storeName || 'Todas las tiendas'}`);
-      
-      const deals = await fetchDeals({ storeID, pageSize, pageNumber });
-      
-      if (deals && deals.length > 0) {
-        console.log(`✓ Se encontraron ${deals.length} juegos en ${storeName}`);
-        renderizarVideojuegos(deals);
-        showError('');
-      } else {
-        console.warn(`⚠️ No hay juegos disponibles en ${storeName}`);
-        showError(`No hay juegos disponibles en ${storeName}`);
-        grid.innerHTML = '';
-        resultsCount.textContent = 'Sin resultados';
-      }
+      await cambiarPagina(0);
     } catch (e) {
       console.error('❌ Error al filtrar por tienda:', e.message);
       showError(`Error al filtrar: ${e.message}`);
-    } finally {
-      showLoading(false);
     }
   }
 
-  // Cargar mas resultados (mantiene el filtro de tienda si existe)
+  // -------------------------------------------------------
+  // Cargar más (mantengo tu función original de "Ver más")
+  // -------------------------------------------------------
   async function cargarMas() {
     try {
       showError('');
       showLoading(true);
       pageNumber += 1;
-      const storeID = storeSelect.value || '';
-      console.log(`⬇️ Cargando página ${pageNumber}...`);
+      const storeID = storeSelect ? (storeSelect.value || '') : '';
+      console.log(`⬇️ Cargando página adicional ${pageNumber}...`);
       
-      const more = await fetchDeals({ storeID, pageNumber, pageSize });
+      const more = await fetchDeals({ storeID, pageNumber, pageSize, title: searchInput ? searchInput.value.trim() : '' });
       
       if (more && more.length > 0) {
-        console.log(`✓ ${more.length} juegos cargados (página ${pageNumber})`);
+        console.log(`✓ ${more.length} juegos cargados (página extra ${pageNumber})`);
         showError('');
         
-        // Agregar juegos al estado y al grid (sin duplicados)
         more.forEach((deal) => {
           const juego = normalizeJuego(deal);
           const card = crearCard(juego);
           grid.appendChild(card);
         });
         
-        // Actualizar estado y contador
         juegosActuales = juegosActuales.concat(more.map(normalizeJuego));
         resultsCount.textContent = `${juegosActuales.length} resultados`;
         console.log(`✅ Total de juegos en pantalla: ${juegosActuales.length}`);
       } else {
         console.warn('⚠️ No hay más juegos disponibles');
         showError('No hay más juegos disponibles');
-        pageNumber -= 1; // Revertir incremento si no hay más resultados
+        pageNumber -= 1;
       }
     } catch (e) {
       console.error('❌ Error al cargar más resultados:', e.message);
       showError(`Error cargando más: ${e.message}`);
-      pageNumber -= 1; // Revertir incremento en caso de error
+      pageNumber -= 1;
     } finally {
       showLoading(false);
     }
   }
 
-  // Funcion para ordenar resultados
-  function ordenarResultados() {
+  // -------------------------------------------------------
+  // Ordenar resultados
+  // -------------------------------------------------------
+  function ordenarResultados(triggerScroll = true) {
+    if (!sortSelect) return;
     const orden = sortSelect.value;
-    let juegosOrdenados = juegosActuales.slice(); // Copia sin modificar original
+    let juegosOrdenados = juegosActuales.slice();
 
     if (orden === 'precio_asc') {
-      // Ordenar por precio de venta ascendente
       juegosOrdenados.sort((a, b) => {
         const precioA = parseFloat(a.salePrice || a.sale || a.normalPrice || a.retail || 999);
         const precioB = parseFloat(b.salePrice || b.sale || b.normalPrice || b.retail || 999);
@@ -458,7 +583,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       console.log('Ordenado por precio ascendente');
     } else if (orden === 'precio_desc') {
-      // Ordenar por precio de venta descendente
       juegosOrdenados.sort((a, b) => {
         const precioA = parseFloat(a.salePrice || a.sale || a.normalPrice || a.retail || 0);
         const precioB = parseFloat(b.salePrice || b.sale || b.normalPrice || b.retail || 0);
@@ -466,48 +590,67 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       console.log('Ordenado por precio descendente');
     } else if (orden === 'descuento') {
-      // Ordenar por mayor descuento
       juegosOrdenados.sort((a, b) => {
         const descA = parseFloat(a.savings || a.descuento || 0);
         const descB = parseFloat(b.savings || b.descuento || 0);
-        return descB - descA; // Mayor descuento primero
+        return descB - descA;
       });
       console.log('Ordenado por mayor descuento');
     }
-    // Si no hay orden especifica, mantener orden por defecto
 
     renderizarVideojuegos(juegosOrdenados);
+    if (triggerScroll) scrollToTop();
   }
 
+  // -------------------------------------------------------
   // Eventos UI
-  if (searchBtn) searchBtn.addEventListener('click', ()=>{ const q = searchInput.value.trim(); if(q) buscarPorTitulo(q); });
-  if (searchInput) searchInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ const q=searchInput.value.trim(); if(q) buscarPorTitulo(q); }});
-  if (storeSelect) storeSelect.addEventListener('change', filtrarPorTienda);
-  if (sortSelect) sortSelect.addEventListener('change', ordenarResultados);
-  if (loadMoreBtn) loadMoreBtn.addEventListener('click', cargarMas);
-  if (modalClose) modalClose.addEventListener('click', ()=>{ modal.classList.add('hidden'); modal.classList.remove('flex'); });
-  if (modal) modal.addEventListener('click',(e)=>{ if(e.target===modal){ modal.classList.add('hidden'); modal.classList.remove('flex'); }});
+  // -------------------------------------------------------
+  if (searchBtn)
+    searchBtn.addEventListener('click', () => {
+      const q = searchInput.value.trim();
+      if (q) buscarPorTitulo(q);
+    });
 
-  // Inicializar: render local mínimo y luego intentar cargar desde API
-  // Mantengo tu render original como fallback
+  if (searchInput)
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const q = searchInput.value.trim();
+        if (q) buscarPorTitulo(q);
+      }
+    });
+
+  if (storeSelect) storeSelect.addEventListener('change', filtrarPorTienda);
+  if (sortSelect) sortSelect.addEventListener('change', () => ordenarResultados(true));
+  if (loadMoreBtn) loadMoreBtn.addEventListener('click', cargarMas);
+
+  if (modalClose)
+    modalClose.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    });
+
+  if (modal)
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    });
+
+  // -------------------------------------------------------
+  // Inicializar: mostrar locales y luego API
+  // -------------------------------------------------------
   try {
-    // Mostrar los locales primero si existen
-    if (typeof videojuegos !== 'undefined' && Array.isArray(videojuegos) && videojuegos.length) {
+    if (Array.isArray(videojuegos) && videojuegos.length) {
+      console.log('✅ Mostrando juegos locales inmediatamente...');
+      currentPage = 0;
+      totalPages = 1;
       renderizarVideojuegos(videojuegos);
     }
-  } catch(e) {
+  } catch (e) {
     console.error(e);
   }
 
   // Cargar desde API y sobreescribir si hay datos
-console.log('⏳ Mostrando juegos locales mientras carga la API...');
-renderizarVideojuegos(videojuegos);
-cargarVideojuegosInicial();
-
-    // Cargar tiendas en segundo plano
-    console.log('⏳ Intentando cargar tiendas desde API...');
-    cargarTiendas().catch(e => {
-      console.warn('⚠️ No se pudieron cargar las tiendas desde API:', e.message);
-    });
+  cargarVideojuegosInicial();
 });
-
