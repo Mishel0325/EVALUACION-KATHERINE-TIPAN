@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     card.innerHTML = `
       <div class="relative overflow-hidden h-40">
         <img src="${juego.image}" alt="${juego.title}" class="h-40 w-full object-cover hover:scale-110 transition-transform duration-300" loading="lazy" />
-        <div class="absolute top-2 right-2 bg-gradient-to-r from-pink-500 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold">${Math.round(juego.savings)}% OFF</div>
+        <div class="absolute top-2 right-2 bg-gradient-to-r from-teal-500 to-sky-600 text-white px-3 py-1 rounded-full text-xs font-bold">${Math.round(juego.savings)}% OFF</div>
       </div>
       <div class="p-4 flex flex-col gap-2 flex-1">
         <h3 class="font-bold text-slate-900 leading-tight text-sm">${juego.title}</h3>
@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <p class="text-sm text-slate-700"><span class="font-black text-emerald-600">${juego.salePrice ? '$' + juego.salePrice : '—'}</span></p>
           ${juego.normalPrice ? `<p class="text-xs text-slate-400 line-through">$${juego.normalPrice}</p>` : ''}
         </div>
-        <button class="mt-3 w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 rounded-lg text-xs font-bold hover:shadow-lg transition transform hover:scale-105" data-url="${juego.url}" data-title="${encodeURIComponent(juego.title)}" data-image="${juego.image}" data-normal="${juego.normalPrice}" data-sale="${juego.salePrice}">🎮 Ver detalle</button>
+        <button class="mt-3 w-full bg-gradient-to-r from-sky-600 to-teal-600 text-white py-2 rounded-lg text-xs font-bold hover:shadow-lg transition transform hover:scale-105" data-url="${juego.url}" data-title="${encodeURIComponent(juego.title)}" data-image="${juego.image}" data-normal="${juego.normalPrice}" data-sale="${juego.salePrice}">🎮 Ver detalle</button>
       </div>
     `;
 
