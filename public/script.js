@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (progressBar && progressBar._loadingInterval) {
         clearInterval(progressBar._loadingInterval);
         progressBar.style.width = '100%';
-        // Ocultar después de la animación
+        // Ocultar despues de la animacion
         setTimeout(() => {
           progressBar.classList.add('hidden');
           progressBar.style.width = '0%';
@@ -97,25 +97,26 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function normalizeJuego(juego) {
-    // Normalize both local and API deal shapes to common fields used in the template
+   // Normalizar tanto las estructuras de acuerdos locales como las de la API a campos comunes utilizados en la plantilla
     const title = juego.nombre || juego.title || juego.external || 'Sin título';
     const image = juego.imagen || juego.thumb || '';
     const description = juego.descripcion || juego.saleText || '';
-    const salePrice = juego.salePrice || juego.sale || '';
-    const normalPrice = juego.retailPrice || juego.normalPrice || juego.retail || '';
+    const salePrice = juego.salePrice || juego.sale || '0';
+    const normalPrice = juego.normalPrice || juego.retailPrice || juego.retail || '0';
     const savings = juego.savings || juego.descuento || 0;
     const id = juego.id || juego.dealID || juego.gameID || '';
     const url = juego.dealID ? `https://www.cheapshark.com/redirect?dealID=${juego.dealID}` : (juego.url || '#');
     return { id, title, image, description, salePrice, normalPrice, savings, url };
   }
 
-  // Función auxiliar para crear una tarjeta de juego
+  // Funcion auxiliar para crear una tarjeta de juego
   function crearCard(juego) {
     const card = document.createElement('article');
     card.className = 'bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100 flex flex-col hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer';
     card.innerHTML = `
       <div class="relative overflow-hidden h-40">
-        <img src="${juego.image}" alt="${juego.title}" class="h-40 w-full object-cover hover:scale-110 transition-transform duration-300" loading="lazy" />
+        ${/* asegurar que nunca se deje src vacío y fijar tamaño para evitar icono gigante */''}
+        <img src="${juego.image || 'https://via.placeholder.com/600x400?text=No+image'}" alt="${juego.title}" class="w-full h-40 sm:h-48 md:h-44 lg:h-48 object-cover hover:scale-110 transition-transform duration-300" loading="lazy" />
         <div class="absolute top-2 right-2 bg-gradient-to-r from-teal-500 to-sky-600 text-white px-3 py-1 rounded-full text-xs font-bold">${Math.round(juego.savings)}% OFF</div>
       </div>
       <div class="p-4 flex flex-col gap-2 flex-1">
@@ -161,8 +162,16 @@ document.addEventListener('DOMContentLoaded', () => {
     return card;
   }
 
+  // fallback para la imagen del modal en caso de error
+  if (modalImage) {
+    modalImage.addEventListener('error', () => {
+      modalImage.src = 'https://via.placeholder.com/600x400?text=Imagen+no+disponible';
+      modalImage.alt = 'Imagen no disponible';
+    });
+  }
+
   function renderizarVideojuegos(lista) {
-    // Limpia el grid antes de renderizar (evita duplicados)
+    // Limpia el grid antes de renderizar evita duplicados
     console.log('🧹 [Renderizar] Limpiando grid...');
     grid.innerHTML = '';
 
@@ -172,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Guardar juegos actuales para poder ordenar después
+    // Guardar juegos actuales para poder ordenar despues
     juegosActuales = lista.slice();
     
     resultsCount.textContent = `${lista.length} resultados`;
@@ -269,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Limpiar opciones previas excepto "Todas las tiendas"
         const opcionesExistentes = storeSelect.querySelectorAll('option');
         opcionesExistentes.forEach((opt, idx) => {
-          if (idx > 0) opt.remove(); // Mantener la primera opción
+          if (idx > 0) opt.remove(); // Mantener la primera opcion
         });
 
         // Añadir tiendas
@@ -332,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Búsqueda usando /games?title=texto&limit=20 y luego obtener deals por title
+  // Busqueda usando /games?title=texto&limit=20 y luego obtener deals por title
   async function buscarPorTitulo(text) {
     try {
       if (!text || text.trim() === '') {
@@ -395,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Cargar más resultados (mantiene el filtro de tienda si existe)
+  // Cargar mas resultados (mantiene el filtro de tienda si existe)
   async function cargarMas() {
     try {
       showError('');
@@ -491,6 +500,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Cargar desde API y sobreescribir si hay datos
-  cargarVideojuegosInicial();
+console.log('⏳ Mostrando juegos locales mientras carga la API...');
+renderizarVideojuegos(videojuegos);
+cargarVideojuegosInicial();
+
+    // Cargar tiendas en segundo plano
+    console.log('⏳ Intentando cargar tiendas desde API...');
+    cargarTiendas().catch(e => {
+      console.warn('⚠️ No se pudieron cargar las tiendas desde API:', e.message);
+    });
 });
 
